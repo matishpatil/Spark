@@ -1,0 +1,112 @@
+Use retail_db data set
+#Problem Statement
+Get daily revenue by product considering completed and closed orders.
+Data need to be sorted in ascending order by date and then descending
+order by revenue computed for each product for each day.
+Data for orders and order_items is available in HDFS
+/public/retail_db/orders and /public/retail_db/order_items
+Data for products is available locally under /data/retail_db/products
+Final output need to be stored under
+HDFS location – avro format
+/user/YOUR_USER_ID/daily_revenue_avro_python
+HDFS location – text format
+/user/YOUR_USER_ID/daily_revenue_txt_python
+Local location /home/YOUR_USER_ID/daily_revenue_python
+Solution need to be stored under
+/home/YOUR_USER_ID/daily_revenue_python.txt
+
+
+pyspark --master yarn \
+  --conf spark.ui.port=12890 \
+  --num-executors 2 \
+  --executor-memory 512M \
+  --packages com.databricks:spark-avro_2.10:2.0.1
+  
+  
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+for i in orders.map(lambda x: x.split(",")[3]).distinct().collect(): print(i)
+ordersFiltered = orders.filter(lambda o: o.split(",")[3] in ["COMPLETE", "CLOSED"])
+ordersMap = ordersFiltered.map(lambda x: (int(x.split(",")[0]), x.split(",")[1]))
+orderItemsMap = orderItems.map(lambda x: (int(x.split(",")[1]), (int(x.split(",")[2]), float(x.split(",")[1]))))
+ordersJoin = ordersMap.join(orderItemsMap)
+ordersJoinMap = ordersJoin.map(lambda x: ((x[1][0],x[1][1][0]),x[1][1][1]))
+from operator import add
+dailyRevenuePerProductID = ordersJoinMap.reduceByKey(add)
+
+productsRaw = open("/data/retail_db/products/part-00000").read().splitlines()
+productsRDD = sc.parallelize(productsRaw)
+productsMap = productsRDD.map(lambda x: (int(x.split(",")[0]), x.split(",")[2]))
+dailyRevenuePerProductIdMap = dailyRevenuePerProductID.map(lambda x: (x[0][1],(x[0][0], x[1])))
+dailyRevenuePerProductJoin = dailyRevenuePerProductIdMap.join(productsMap)
+dailyRevenuePerProduct = dailyRevenuePerProductJoin.map(lambda x: ((x[1][0][0], -x[1][0][1]), x[1][0][0] + "," + str(x[1][0][1]) + "," + x[1][1]))
+dailyRevenuePerProductSorted = dailyRevenuePerProduct.sortByKey()
+dailyRevenuePerProductName = dailyRevenuePerProductSorted.map(lambda r: r[1])
+for i in dailyRevenuePerProductName.take(10): print(i)
+
+dailyRevenuePerProductName.coalesce(2).saveAsTextFile("/user/matishpatil/daily_revenue_txt_python")
+sc.textFile("/user/matishpatil/daily_revenue_txt_python/part-00000").take(10)
+
+hadoop fs -rm -R /user/matishpatil/daily_revenue_txt_python
+hadoop fs -tail /user/matishpatil/daily_revenue_txt_python/part-00000
+
+dailyRevenuePerProductNameDF = dailyRevenuePerProductName.coalesce(2).toDF(schema=["order_date", "revenue_per_product", "product_name"])
+dailyRevenuePerProductNameDF.save("/user/matishpatil/daily_revenue_avro_python", "com.databricks.spark.avro")
+sqlContext.load("/user/matishpatil/daily_revenue_python","com.databricks.spark.avro")
+======================================================================================================
+pyspark --master yarn --conf spark.ui.port=23212 --packages com.databricks:spark-avro_2.10:2.0.1
+======================================================================================================
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+ordersFiltered = orders. \
+filter(lambda o: o.split(",")[3] in ["COMPLETE", "CLOSED"])
+
+ordersMap = ordersFiltered. \
+map(lambda o: (int(o.split(",")[0]), o.split(",")[1]))
+orderItemsMap = orderItems. \
+map(lambda oi: 
+     (int(oi.split(",")[1]), (int(oi.split(",")[2]), float(oi.split(",")[4])))
+   )
+
+ordersJoin = ordersMap.join(orderItemsMap)
+ordersJoinMap = ordersJoin. \
+map(lambda o: ((o[1][0], o[1][1][0]), o[1][1][1]))
+
+from operator import add
+dailyRevenuePerProductId = ordersJoinMap.reduceByKey(add)
+
+productsRaw = open("/data/retail_db/products/part-00000"). \
+read(). \
+splitlines()
+products = sc.parallelize(productsRaw)
+
+productsMap = products. \
+map(lambda p: (int(p.split(",")[0]), p.split(",")[2]))
+dailyRevenuePerProductIdMap = dailyRevenuePerProductId. \
+map(lambda r: (r[0][1], (r[0][0], r[1])))
+
+dailyRevenuePerProductJoin = dailyRevenuePerProductIdMap.join(productsMap)
+
+dailyRevenuePerProduct = dailyRevenuePerProductJoin. \
+map(lambda t: 
+     ((t[1][0][0], -t[1][0][1]), (t[1][0][0], round(t[1][0][1], 2), t[1][1]))
+   )
+dailyRevenuePerProductSorted = dailyRevenuePerProduct.sortByKey()
+dailyRevenuePerProductName = dailyRevenuePerProductSorted. \
+map(lambda r: r[1])
+dailyRevenuePerProductNameDF = dailyRevenuePerProductName. \
+coalesce(2). \
+toDF(schema=["order_date", "revenue_per_product", "product_name"])
+
+dailyRevenuePerProductNameDF.save("/user/dgadiraju/daily_revenue_avro_python", "com.databricks.spark.avro")
+=======================================================================
+spark-submit --master yarn \
+    --conf spark.ui.port=23432 \
+    --num-executors 2 \
+    --executor-memory 512M \
+    src/main/python/DailyRevenuePerProduct.py
+
+
+

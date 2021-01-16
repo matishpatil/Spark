@@ -1,0 +1,276 @@
+set hive.metastore.warehouse.dir;
+
+cd /etc/hive/conf/hive-site.xml
+
+create database matishpatil_retail_db_txt;
+use matishpatil_retail_db_txt;
+
+dfs -ls /apps/hive/warehouse/matishpatil_retail_db_txt;
+
+create table orders (
+  order_id int,
+  order_date string,
+  order_customer_id int,
+  order_status string
+) row format delimited fields terminated by ','
+stored as textfile;
+
+Hive language manual
+
+load data local inpath '/data/retail_db/orders' into table orders;
+dfs -ls /apps/hive/warehouse/matishpatil_retail_db_txt.db/orders;
+
+create table order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float
+) row format delimited fields terminated by ','
+stored as textfile;
+
+load data local inpath '/data/retail_db/order_items' into table order_items;
+dfs -ls /apps/hive/warehouse/matishpatil_retail_db_txt.db/order_items;
+=============================================================================
+create database matishpatil_retail_db_orc;
+use matishpatil_retail_db_orc;
+
+create table orders (
+  order_id int,
+  order_date string,
+  order_customer_id int,
+  order_status string
+) stored as orc;
+
+insert into table orders select * from matishpatil_retail_db_txt.orders;
+
+create table order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float
+) stored as orc;
+
+insert into table order_items select * from matishpatil_retail_db_txt.order_items;
+=================================================================================
+describe orders;
+describe formatted/extended orders;
+
+sqlContext.sql("use matishpatil_retail_db_txt")
+sqlContext.sql("show tables").show()
+for i in sqlContext.sql("describe formatted orders").collect(): print(i)
+=================================================================================
+hive (default)> show functions;
+hive (default)> describe function length;
+hive (default)> select length('matishpatil');
+=================================================================================
+create table customers (
+customer_id int,
+customer_fname varchar(45),
+customer_lname varchar(45),
+customer_email varchar(45),
+customer_password varchar(45),
+customer_street varchar(255),
+customer_city varchar(45),
+customer_state varchar(45),
+customer_zipcode varchar(45)
+) row format delimited fields terminated by ‘,’
+stored as textfile;
+load data local inpath ‘/data/retail_db/customers’ into table customers;
+=================================================================================
+str/substring
+instr
+like
+rlike
+length
+lcase/lower
+ucase/upper
+trim, ltrim, rtrim
+lpad, rpad
+initcap
+cast - select cast("12" as int)
+concat
+split - select index(split("How are you?", ' '), 4)
+=================================================================================
+current_date
+curent_timestamp
+date_add
+date_format - select date_format(current_date, 'y')
+datesub
+datediff
+day 
+dayofmonth
+to_date
+to_unix_timestamp
+to_utc_timestamp
+from_unixtime
+from_utc_timestamp
+minute
+month
+months_between
+next_day
+==================================================================================
+sum, min, max,count, avg
+case...end, nvl
+Row level transformations
+Joins
+Aggregations
+==================================================================================
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000;
+==================================================================================
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000
+order by o.order_date, order_revenue desc;
+
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000
+distribute by o.order_date sort by o.order_date, order_revenue desc;
+==================================================================================
+Set Operations - union, union all
+Analytical Functions - 
+select * from (
+select o.order_id, o.order_date, o.order_status, oi.order_item_subtotal, 
+round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) pct_revenue,
+round(avg(oi.order_item_subtotal) over (partition by o.order_id), 2) avg_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc, rank_revenue;
+==================================================================================
+select * from (
+select o.order_id, o.order_date, o.order_status, oi.order_item_subtotal, 
+round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) pct_revenue,
+round(avg(oi.order_item_subtotal) over (partition by o.order_id), 2) avg_revenue,
+rank() over (partition by o.order_id order by oi.order_item_subtotal desc) rnk_revenue,
+dense_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) dense_rnk_revenue,
+percent_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) pct_rnk_revenue,
+row_number() over (partition by o.order_id order by oi.order_item_subtotal desc) rn_orderby_revenue,
+row_number() over (partition by o.order_id) rn_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc, rnk_revenue;
+==================================================================================
+LEAD
+----
+The number of rows to lead can optionally be specified. If the number of rows to lead is not specified, the lead is one row.
+Returns null when the lead for the current row extends beyond the end of the window.
+LAG
+---
+The number of rows to lag can optionally be specified. If the number of rows to lag is not specified, the lag is one row.
+Returns null when the lag for the current row extends before the beginning of the window.
+FIRST_VALUE
+-----------
+This takes at most two parameters. The first parameter is the column for which you want the first value, the second (optional) parameter must be a boolean which is by false default. If set to true it skips null values.
+LAST_VALUE
+----------
+This takes at most two parameters. The first parameter is the column for which you want the last value, the second (optional) parameter must be a boolean which is by false default. If set to true it skips null values.
+==================================================================================
+select * from (
+select o.order_id, o.order_date, o.order_status, oi.order_item_subtotal, 
+round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) pct_revenue,
+round(avg(oi.order_item_subtotal) over (partition by o.order_id), 2) avg_revenue,
+rank() over (partition by o.order_id order by oi.order_item_subtotal desc) rnk_revenue,
+dense_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) dense_rnk_revenue,
+percent_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) pct_rnk_revenue,
+row_number() over (partition by o.order_id order by oi.order_item_subtotal desc) rn_orderby_revenue,
+row_number() over (partition by o.order_id) rn_revenue,
+lead(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) lead_order_item_subtotal,
+lag(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) lag_order_item_subtotal,
+first_value(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) first_order_item_subtotal,
+last_value(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) last_order_item_subtotal
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc, rnk_revenue;
+==================================================================================
+from pyspark.sql import Row
+ordersRDD = sc.textFile("/public/retail_db/orders")
+ordersDF = ordersRDD.\
+map(lambda o: Row(order_id=int(o.split(",")[0]), order_date=o.split(",")[1], order_customer_id=int(o.split(",")[2]), order_status=o.split(",")[3])).toDF()
+ordersDF.registerTempTable("ordersDF_table")
+sqlContext.sql("select order_status, count(1) from ordersDF_table group by order_status").show()
+==================================================================================
+sqlContext.sql("use matishpatil_retail_db_txt")
+from pyspark.sql import Row
+productsRaw = open("/data/retail_db/products/part-00000").read().splitlines()
+productsRDD = sc.parallelize(productsRaw)
+productsDF = productsRDD.\
+map(lambda p: Row(product_id=int(p.split(",")[0]), product_name=p.split(",")[2])).\
+toDF()
+productsDF.registerTempTable("products")
+
+sqlContext.sql("select * from products").show()
+sqlContext.sql("select * from orders").show()
+sqlContext.sql("select * from order_items").show()
+
+sqlContext.setConf("spark.sql.shuffle.partitions", "2")
+sqlContext.sql("SELECT o.order_date, p.product_name, sum(oi.order_item_subtotal) daily_revenue_per_product \
+FROM orders o JOIN order_items oi \
+ON o.order_id = oi.order_item_order_id \
+JOIN products p \
+ON p.product_id = oi.order_item_product_id \
+WHERE o.order_status IN ('COMPLETE', 'CLOSED') \
+GROUP BY o.order_date, p.product_name \
+ORDER BY o.order_date, daily_revenue_per_product DESC").show()
+==================================================================================
+sqlContext.sql("CREATE DATABASE matishpatil_daily_revenue");
+sqlContext.sql("CREATE TABLE matishpatil_daily_revenue.daily_revenue (order_date string, product_name string, daily_revenue_per_product float) STORED AS orc")
+
+daily_revenue_per_product_df = sqlContext.sql("SELECT o.order_date, p.product_name, sum(oi.order_item_subtotal) daily_revenue_per_product \
+FROM orders o JOIN order_items oi \
+ON o.order_id = oi.order_item_order_id \
+JOIN products p \
+ON p.product_id = oi.order_item_product_id \
+WHERE o.order_status IN ('COMPLETE', 'CLOSED') \
+GROUP BY o.order_date, p.product_name \
+ORDER BY o.order_date, daily_revenue_per_product DESC")
+
+daily_revenue_per_product_df.insertInto("matishpatil_daily_revenue.daily_revenue")
+==================================================================================
+agg - aggregate - sum, min, max
+count
+describe
+distinct
+drop
+filter
+insertInto - insert data into hive table
+saveAsParquetFile
+write
+printSchema
+select
+==================================================================================
+
+
+
+
+
+
+
+
+
+
+
+

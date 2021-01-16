@@ -1,0 +1,226 @@
+: paste mode
+
+val - immutable
+var - mutable
+
+val i = 1.+(2)
+val s = "Hello World"
+s.substring(6,8) - prints Wo
+(1 to 100)
+for (i <- ( 1 to 100)) { println(i)}
+var total = 0
+for (element <- ( 1 to 100)) { total += element }
+============================================================
+Functions:
+----------
+
+def sum(lb: Int, ub: Int) = {
+    var total = 0
+    for(element <- lb to ub){
+        total += element
+    }
+    total
+}
+
+sum(1,10)
+
+def sumOfSquares(lb: Int, ub: Int) = {
+    var total = 0
+    for(element <- lb to ub){
+        total += element * element
+    }
+    total
+}
+
+def sum(func: Int => Int, lb: Int, ub: Int) = {
+    var total = 0
+    for(element <- lb to ub){
+        total += func(element)
+    }
+   total 
+}
+
+def id(i: Int) = i
+def square(i: Int) = i*i
+def cube(i: Int) = i*i*i
+def double(i: Int) = i * 2
+
+sum(cube,1,10)
+============================================================
+Classes:
+--------
+
+class Order(orderId: Int, orderDate: String, orderCustomerId: Int, orderStatus: String){
+    println(" I am inside Order Constructor")
+}
+
+:javap -p Order
+
+val order = new Order(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+
+class Order(orderId: Int, orderDate: String, orderCustomerId: Int, orderStatus: String){
+    println(" I am inside Order Constructor")
+    override def toString = "Order(" + orderId + "," + orderDate + "," + orderCustomerId + "," + orderStatus + ")"
+}
+
+val order = new Order(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+
+class Order(val orderId: Int, val orderDate: String, val orderCustomerId: Int, val orderStatus: String){
+    println(" I am inside Order Constructor")
+    override def toString = "Order(" + orderId + "," + orderDate + "," + orderCustomerId + "," + orderStatus + ")"
+}
+
+val order = new Order(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+:javap -p Order
+
+class Order(var orderId: Int, var orderDate: String, var orderCustomerId: Int, var orderStatus: String){
+    println(" I am inside Order Constructor")
+    override def toString = "Order(" + orderId + "," + orderDate + "," + orderCustomerId + "," + orderStatus + ")"
+}
+
+val order = new Order(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+:javap -p Order
+order.orderId
+order.orderId = 3
+order.orderId
+============================================================
+Objects: Singleton class - define static method
+--------
+
+object HelloWorld {
+    def main(args: Array[String]): Unit = {
+        print("Hello World")
+    }
+}
+
+HelloWorld.main(Array(" "))
+
+Companion Object: object has same name as class
+-----------------
+class Order(val orderId: Int, val orderDate: String, val orderCustomerId: Int, val orderStatus: String){
+    println(" I am inside Order Constructor")
+    override def toString = "Order(" + orderId + "," + orderDate + "," + orderCustomerId + "," + orderStatus + ")"
+}
+
+object Order {
+    def apply(orderId: Int, orderDate: String, orderCustomerId: Int, orderStatus: String): Order = {
+        new Order(orderId, orderDate, orderCustomerId, orderStatus)
+    }
+    
+    def apply(orderId: String, orderDate: String, orderCustomerId: String, orderStatus: String): Order = {
+        new Order(orderId.toInt, orderDate, orderCustomerId.toInt, orderStatus)
+    }
+}
+
+val order = Order.apply(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+
+:javap -p Order
+:javap -p Order$
+============================================================
+Case Classes: Companion object is automatically created
+-------------
+
+scala.Product - Arity - attributes and properties
+scala.Serializable
+
+case class Order(val orderId: Int, val orderDate: String, val orderCustomerId: Int, val orderStatus: String){
+    println(" I am inside Order Constructor")
+    override def toString = "Order(" + orderId + "," + orderDate + "," + orderCustomerId + "," + orderStatus + ")"
+}
+
+val order = Order.apply(1, "2013-10-01 00:00:00.000", 100, "COMPLETE")
+
+order.OrderId
+order.productArity
+order.productElement - accessing elements based on position
+order.productIterator
+order.productIterator.foreach(println)
+order.productPrefix - returns case class name
+============================================================
+Collections (Seq, Map, Set):
+----------------------------
+
+val a = Array(1,2,3,4,5)
+val l = List(1,2,3,4)
+val s = Set(1,2,2,3,3,4,4,2,2,3,3)
+val m = Map("Hello" -> 1, "World" -> 2)
+
+trait/interface called iterator
+
+a.foreach(println)
+l.foreach(println)
+s.foreach(println)
+m.foreach(println)
+
+l.size
+l.min
+l.max
+============================================================
+Map Filter Reduce Operations:
+-----------------------------
+
+val l = (1 to 100).toList
+val f = l.filter(ele => ele%2 == 0)
+val r = f.reduce((x,y) => x + y)
+
+val sqrSum = l.filter(ele => ele%2 == 0).map(rec => rec * rec).reduce((total,element) => total + element)
+============================================================
+Basic I/O operations:
+---------------------
+
+import scala.io.Source
+val orderItems = Source.fromFile("/data/retail_db/order_items/part-00000").getLines().toList - convert BufferedSource to iterator
+view part-00000
+
+orderItems.take(10).foreach(println)
+val orderItemsFiltered = orderItems.filter(oi => oi.split(",")(1).toInt == 2)
+val orderItemsMap = orderItemsFiltered.map(oi => oi.split(",")(4).toFloat)
+val orderItemsValue = orderItemsMap.reduce((total,element) => total + element)
+============================================================
+Tuples:
+-------
+
+import scala.io.Source
+val orderItems = Source.fromFile("/data/retail_db/order_items/part-00000").getLines().toList
+val t = (1,1,957,1,299.98,299.98)
+
+Tuples doesn't have attribute names associated with them so they can be accessed using positional notation.
+============================================================
+import scala.io.Source
+
+object OrderRevenue {
+    def main(args: Array[String]){
+        val orderId = args(0).toInt
+        val orderItems = Source.fromFile("/data/retail_db/order_items/part-00000").getLines
+        val orderRevenue = orderItems.filter(oi => oi.split(",")(1).toInt == orderId)
+                            .map(r => r.split(",")(4).toFloat).reduce((t,v) => t + v)
+        println(orderRevenue)
+    }
+}
+
+scala src/main/scala/orderRevenue.scala
+============================================================
+SBT:
+----
+
+ls -ltr src/main/scala
+sbt package
+ls -ltr /home/matishpatil/ScalaProject/target/scala-2.10/classes
+ls -ltr /home/matishpatil/ScalaProject/target/scala-2.10/retail_2.10-1.0.jar
+sbt run
+scala /home/matishpatil/ScalaProject/target/scala-2.10/retail_2.10-1.0.jar
+scala /home/matishpatil/ScalaProject/target/scala-2.10/retail_2.10-1.0.jar OrderRevenue
+sbt "run-main OrderRevenue 2"
+============================================================
+set -o vi (vi editing mode)
+ssh @
+$PS1
+echo $
+
+============================================================
+
+============================================================
+
+============================================================
+
+============================================================

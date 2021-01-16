@@ -1,0 +1,181 @@
+create database d1;
+create database if not exists d1;
+create database if not exists d2 comment "This is new database.";
+describe database d1;
+describe database extended d2;
+create database if not exists d3 with dbproperties('creator'='Matish', 'date'='2020-08-24');
+describe database extended d3;
+
+show databases;
+use d2;
+
+create table if not exists table1 (col1 string, col2 array<string>, col3 string, col4 int) row format delimited fields terminated by ',' collection items terminated by ':' lines terminated by '\n' stroed as textfile;
+
+set hive.metastore.warehouse.dir;
+
+create table if not exists table3 (col1 string, col2 array<string>, col3 string, col4 int) row format delimited fields terminated by ',' collection items terminated by ':' lines terminated by '\n' stroed as textfile location '/user/matish/table3';
+
+load data local inpath '/home/matish/data.txt' into table table1;
+into - append data
+overwrite - overwrite the data
+
+set hive.cli.print.header=true;
+
+# Load data into multiple table
+from emp_tab insert into table developer_tab select col1,col2,col3 where col3='Developer' insert into table manager_tab select col1, col2, col3 where col3='Mgr';
+=============================================================================================================
+alter table tab add columns (col4 string, col5 int);
+
+alter table tab change col1 col1 after col3;
+
+alter table tab change column col2 new_col2 string;
+
+alter table tab rename to tab1;
+
+alter table tab1 replace columns (id int, name string);
+
+describe formatted tab1;
+
+alter table tab1 set tblproperties('auto.purge'='true');
+
+alter table tab1 set fileformat avro;
+=============================================================================================================
+Order By uses single reducer
+selct col2 from table5 order by col2 limit 5; ---order by strict mode needs to provide with limit clause
+
+Sort by - sorting within reducers
+Distribute by - keys
+select col2 from tab1 distribute by col2;
+
+select col2 from tab1 distribute by col2 sort by col2;
+
+CLUSTER BY = DISTRIBUTE BY SORT BY
+=============================================================================================================
+select unix_timestamp('2020-08-24 00:00:00');
+select from_unixtimE(1598241600);
+TO_DATE()
+YEAR()
+MONTH()
+DAY()
+HOUR()
+MINUTE()
+SECOND()
+WEEKOFYEAR()
+DATEDIFF()
+DATE_ADD()
+DATE_SUB()
+
+CEIL()
+FLOOR()
+ROUND()
+RAND()
+
+concat()
+length()
+lower()
+upper()
+lpad()
+rpad()
+trim()
+ltrim()
+rtrim()
+repeat()
+reverse()
+
+split()
+substr()
+instr()
+
+select if(col3='England', col1, col4) from table1;
+case when then end
+isnull(col1)
+isnotnull(col1)
+COALESCE() - returns first non-null values from the row.
+NVL(col1, col2) - select col2 if col1 is null
+
+explode() - explodes values in multiple columns
+select author_name, dummy_booksname from table2 lateral view explode (books_name) dummy as dummy_booksname;
+
+Rlike - select 'hadoop' rlike 'ha';
+
+RANK()
+DENSE_RANK()
+Row_number()
+==================================================================================
+Static Partitioning - load data into partitions manually
+Dynamic Partitioning - 
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict; 
+insert into table part_dept1 partition (deptname) select col1, col3, col4, col2 from dept;
+---partitioning column should be kept at last
+
+static partitioning is faster than dynamic partitioning;
+
+show partitions part_dept1;
+alter table part_dept1 drop partition (deptname="HR");
+alter table part_dept1 add partition (deptname="Dev");
+msck repair table part_dept1;
+==================================================================================
+set hive.enforce.bucketing = true;
+set hive.exec.dynamic.partition.mode = nonstrict;
+
+show partitions <table name>;
+... tabelsample (bucket 1 out of 2 on location);
+... tablesample (2 percent)
+... tablesample (1M)
+... tablesample (20 rows)
+
+no_drop - stop from table accidentally dropped
+alter table emp_tab enable no_drop;
+alter table emp_tab disable no_drop;
+
+alter table dept_tab enable offline;
+offline - table can not be queried
+==================================================================================
+Joins:
+------
+Last table in query is streamed
+Rest are buffered in memory
+/STREAMTABLE
+
+MPJOINS - joining data within mappers without using reducers.
+/*+ MAPJOIN(table Name)
+set hive.auto.convert.join = true;
+set hive.mapjoin.smalltable.filesize;
+Full outer join of mapjoins is not possible.
+
+set hive.input.format = org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
+set hive.optimize.bucketmapjoin = true;
+set hive.auto.convert.sortmerge.join = true;
+set hive.optimize.bucketmapjoin.sortedmerge = true;
+==================================================================================
+A view is a virtual table created as a result of a hive query on a table.
+
+1. Views can be used to hide underlying table columns from some users.
+2. Views protect our base table from being accidentally dropped or altered.
+3. Views can help turning the lengthy and complicated query into a one-liner query.
+==================================================================================
+Partitioning is done at hdfs while indexing is done at table level.
+Compact and bitmap.
+create index i1 on table table9(col3) as 'COMPACT' with deferred rebuild;
+show formatted index on table9;
+==================================================================================
+tblproperties("skip.header.line.count"="3")
+tblproperties("auto.purge"="true")
+tblproperties("serialization.null.format"=)
+==================================================================================
+
+==================================================================================
+
+==================================================================================
+
+==================================================================================
+
+==================================================================================
+
+==================================================================================
+
+==================================================================================
+
+
+

@@ -1,0 +1,83 @@
+#Set operations - Prepare data - subsets of products for 2013-12 and 2014-01
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+orders201312 = orders.filter(lambda o: o.split(",")[1][:7] == "2013-12").map(lambda o: (int(o.split(",")[0]), o))
+
+orders201401 = orders.filter(lambda o: o.split(",")[1][:7] == "2014-01").map(lambda o: (int(o.split(",")[0]), o))
+
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), oi))
+
+orderItems201312 = orders201312.join(orderItemsMap).map(lambda oi: oi[1][1])
+orderItems201401 = orders201401.join(orderItemsMap).map(lambda oi: oi[1][1])
+
+
+#Set operations - Union - Get product ids sold in 2013-12 and 2014-01
+products201312 = orderItems201312.map(lambda p: int(p.split(",")[2]))
+products201401 = orderItems201401.map(lambda p: int(p.split(",")[2]))
+
+allproducts = products201312.union(products201401).distinct()
+
+
+#Set operations - Intersection - Get product ids sold in both 2013-12 and 2014-01
+products201312 = orderItems201312.map(lambda p: int(p.split(",")[2]))
+products201401 = orderItems201401.map(lambda p: int(p.split(",")[2]))
+
+commonproducts = products201312.intersection(products201401)
+
+#Set operations - minus - Get product ids sold in 2013-12 but not in 2014-01
+products201312only = products201312.subtract(products201401).distinct()
+
+products201401only = products201401.subtract(products201312).distinct()
+
+#Set operations - (a-b)u(b-a)
+productsSoldOnlyInOneMonth = products201312only.union(products201401only)
+
+
+#Saving as text files with delimiters - revenue per order id
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).map(lambda r: str(r[0]) + "\t" + str(r[1]))
+
+revenuePerOrderId.saveAsTextFile("/user/matishpatil/revenue_per_order_id")
+
+# hadoop fs -ls /user/matishpatil/revenue_per_order_id
+# hadoop fs -tail /user/matishpatil/revenue_per_order_id/part-00000
+
+for i in sc.textFile("/user/matishpatil/revenue_per_order_id").take(100): print(i)
+
+
+############Compression#################################
+compressionCodecClass="org.apache.hadoop.io.compress.GzipCodec"
+cd /etc/hadoop/conf
+vi core-site.xml - search codec
+Codec - Deflate(default), GzipCodec, SnappyCodec
+
+
+# Saving as text file - compression
+# Get compression codec from /etc/hadoop/conf/core-site.xml
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).map(lambda r: str(r[0]) + "\t" + str(r[1]))
+
+revenuePerOrderId.saveAsTextFile("/user/matishpatil/revenue_per_order_compressed",
+  compressionCodecClass="org.apache.hadoop.io.compress.SnappyCodec")
+  
+  
+# Saving as JSON - Get revenue per order id
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).map(lambda r: (r[0], round(r[1], 2)))
+
+revenuePerOrderIdDF = revenuePerOrderId.toDF(schema=["order_id", "order_revenue"])
+
+revenuePerOrderIdDF.save("/user/matishpatil/revenue_per_order_json", "json")
+revenuePerOrderIdDF.write.json("/user/matishpatil/revenue_per_order_json")
+
+sqlContext.read.json("/user/matishpatil/revenue_per_order_json").show()

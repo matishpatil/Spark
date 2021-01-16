@@ -1,0 +1,144 @@
+spark = SparkSession.builder.master('yarn').appName('spark sql').getOrCreate()
+
+Here is the problem statement for which we will be exploring Data Frame APIs to come up with final solution.
+
+Get daily product revenue
+orders – order_id, order_date, order_customer_id, order_status
+order_items – order_item_id, order_item_order_id, order_item_product_id, order_item_quantity, order_item_subtotal, order_item_product_price
+Data is comma separated
+We will fetch data using spark.read.csv
+Apply type cast functions to convert fields into their original type where ever is applicable.
+=================================================================================================
+from pyspark.sql import SparkSession
+
+spark = SparkSession. \
+  builder. \
+  master('local'). \
+  appName('CSV Example'). \
+  getOrCreate()
+
+orders = spark.read. \
+  format('csv'). \
+  schema('order_id int, order_date string, order_customer_id int, order_status string'). \
+  load('hdfs:///user/matishpatil/retail_db/orders')
+
+orders.printSchema()
+orders.show()
+
+orderItems = spark.read. \
+  format('csv'). \
+  schema('''order_item_id int, 
+            order_item_order_id int, 
+            order_item_product_id int, 
+            order_item_quantity int,
+            order_item_subtotal float,
+            order_item_product_price float
+         '''). \
+  load('/user/matishpatil/retail_db/order_items')
+
+orderItems.printSchema()
+orderItems.show()
+=================================================================================================
+# In case you are using pycharm, first you need to create object of type SparkSession
+spark = SparkSession. \
+  builder. \
+  master('local'). \
+  appName('CSV Example'). \
+  getOrCreate()
+
+ordersCSV = spark.read. \
+  csv('/public/retail_db/orders'). \
+  toDF('order_id', 'order_date', 'order_customer_id', 'order_status')
+
+orderItemsCSV = spark.read. \
+  csv('/public/retail_db/order_items'). \
+  toDF('order_item_id', 'order_item_order_id', 'order_item_product_id', 
+       'order_item_quantity', 'order_item_subtotal', 'order_item_product_price')
+
+from pyspark.sql.types import IntegerType, FloatType
+
+orders = ordersCSV. \
+  withColumn('order_id', ordersCSV.order_id.cast(IntegerType())). \
+  withColumn('order_customer_id', ordersCSV.order_customer_id.cast(IntegerType()))
+
+orders.printSchema()
+orders.show()
+
+orderItems = orderItemsCSV.\
+    withColumn('order_item_id', orderItemsCSV.order_item_id.cast(IntegerType())). \
+    withColumn('order_item_order_id', orderItemsCSV.order_item_order_id.cast(IntegerType())). \
+    withColumn('order_item_product_id', orderItemsCSV.order_item_product_id.cast(IntegerType())). \
+    withColumn('order_item_quantity', orderItemsCSV.order_item_quantity.cast(IntegerType())). \
+    withColumn('order_item_subtotal', orderItemsCSV.order_item_subtotal.cast(FloatType())). \
+    withColumn('order_item_product_price', orderItemsCSV.order_item_product_price.cast(FloatType()))
+
+orderItems.printSchema()
+orderItems.show()
+=================================================================================================
+orders.select(orders.order_date,orders.order_status).show()
+orders.select('order_date', 'order_status').show(truncate=False)
+
+from pyspark.sql.functions import substring
+orders.select(substring('order_date', 1,7)).show()
+orders.select(substring('order_date', 1,7).alias('order_month')).show()
+orders.withColumn('order_month', substring('order_date',1,7)).show()
+orders.selectExpr('substring(order_date,1,7) as order_month').show()
+=================================================================================================
+orders.filter(orders.order_status == 'COMPLETE').show()
+orders.filter("order_status == 'COMPLETE'").show()
+
+orders.filter((orders.order_status == 'COMPLETE') | (orders.order_status == 'CLOSED')).show()
+orders.filter("order_status == 'COMPLETE' or order_status == 'CLOSED'").show()
+orders.filter(orders.order_status.isin('COMPLETE','CLOSED')).show()
+orders.filter("order_status in ('COMPLETE','CLOSED')").show()
+orders.filter((orders.order_status.isin('COMPLETE','CLOSED')) & (orders.order_date.like('2013-08%'))).show()
+__and__
+__or__
+orders.filter("order_status in ('COMPLETE', 'CLOSED') AND order_date like ('2013-08%')").show()
+
+from pyspark.sql.functions import round
+orderItems.select('order_item_subtotal', 'order_item_quantity', 'order_item_product_price') \
+    .where("order_item_subtotal != round((order_item_quantity * order_item_product_price),2)").show()
+
+from pyspark.sql.functions import date_format,max,min
+orders.select(max('order_date')).show()
+orders.select(min('order_date')).show()
+orders.filter(date_format(orders.order_date, 'dd') == '01').show()
+orders.filter(date_format(orders.order_date, 'dd') == '01').select('order_date').distinct().count()
+=================================================================================================
+ordersFiltered = orders.where("order_status in ('COMPLETE', 'CLOSED')")
+ordersJoin = ordersFiltered.join(orderItems, ordersFiltered.order_id == orderItems.order_item_order_id, 'inner')
+
+orders.select('order_id').distinct().count()
+orderItems.select("order_item_order_id").distinct().count()
+ordersLeftOuterJoin = orders.join(orderItems, ordersFiltered.order_id == orderItems.order_item_order_id, 'left_outer')
+ordersLeftOuterJoin.where("order_item_order_id is null").show()
+ordersRightOuterJoin = orders.join(orderItems, ordersFiltered.order_id == orderItems.order_item_order_id, 'right_outer')
+ordersRightOuterJoin.where("order_id is null").show()
+=================================================================================================
+from pyspark.sql.functions import countDistinct,sum,round,count
+
+orders.select(countDistinct('order_status')).show()
+orderItems.filter('order_item_order_id = 2').select(sum('order_item_subtotal')).show()
+orderItems.filter('order_item_order_id = 2').select(round(sum('order_item_subtotal'),2).alias('sum_subtotal')).show()
+orderItems.groupBy('order_item_order_id').agg(round(sum('order_item_subtotal'),2).alias('order_revenue')).show()
+orders.groupBy('order_status').count().show()
+orders.groupBy('order_status').agg(count('order_status').alias('status_count')).show()
+
+ordersJoin = ordersFiltered.join(orderItems, ordersFiltered.order_id == orderItems.order_item_order_id, 'inner')
+ordersJoin.groupBy('order_date','order_item_product_id').agg(round(sum('order_item_subtotal'),2).alias('product_revenue')).show()
+=================================================================================================
+orders.sort('order_date', 'order_customer_id').show()
+orders.sort(['order_date', 'order_customer_id'], ascending=[0,1]).show()
+orders.sortWithinPartitions(['order_date', 'order_customer_id'], ascending=[0,1]).show()
+orders.sort(orders.order_date.desc(), 'order_status').show()
+
+spark.conf.set('spark.sql.shuffle.partitions','2')
+=================================================================================================
+Py4J
+spark2demo spark-submit src/main/python/DailyProductRevenue.py dev
+=================================================================================================
+scp -r training@gw02.itversity.com:~
+export PYSPARK_PYTHON=python3
+spark2-submit --master yarn --deploy-mode client --conf spark.ui.port=12342 src/main/python/DailyProductRevenue.py prod
+=================================================================================================

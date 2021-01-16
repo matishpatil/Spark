@@ -1,0 +1,20 @@
+scalac Count_Committers.scala
+
+scala Count_Committers spark-committers-no-header.tsv
+
+build.sbt
+
+mkdir -p src/{main,test}/{java,resources,scala}
+sbt run
+sbt package
+scala <jar file> <parmaters>
+
+40.getClass
+40.+(2)
+
+val myList = List[String] ("Xavier","Irene")
+val myMap = Map[String, String] ("Xavier" -> "author", "Irene" -> "QA")
+Seq(1,2,3,4)
+val myTuple = ("Xavier","Irene")
+
+
