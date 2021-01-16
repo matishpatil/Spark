@@ -1,0 +1,29 @@
+wget http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-5.1.30.tar.gz 
+tar -xvzf mysql-connector-java-5.1.30.tar.gz
+
+wget https://repo1.maven.org/maven2/com/databricks/spark-avro_2.11/4.0.0/spark-avro_2.11-4.0.0.jar
+
+
+spark2-shell --master yarn --jars mysql-connector-java-5.1.30/mysql-connector-java-5.1.30-bin.jar --conf spark.ui.port=32321 --packages com.databricks:spark-avro_2.11:4.0.0
+
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.functions.lit
+
+val spark = SparkSession.builder().appName("Exam").master("yarn").getOrCreate()
+val jdbcDF = spark.read.format("jdbc").option("url","jdbc:mysql://ms.itversity.com/nyse").option("driver", "com.mysql.jdbc.Driver").option("dbtable","stocks_eod").option("user", "nyse_user").option("password", "itversity").load()
+
+val compositeDF = jdbcDF.withColumn("Composite_colmun", concat(col("stockticker"),lit(","),col("tradedate")))
+
+import com.databricks.spark.avro._
+compositeDF.coalesce(4).write.format("com.databricks.spark.avro").mode("overwrite").save("/user/matishpatil/cca175_practice_test1/problem1/data/stocks_eod")
+
+compositeDF.coalesce(4).write.format("csv").mode("overwrite").save("/user/matishpatil/cca175_practice_test1/problem1/data/stocks_eod")
+
+hadoop fs -ls /user/matishpatil/cca175_practice_test1/problem1/data/stocks_eod
+
+spark2-shell  --master yarn  --conf spark.ui.port=12891  --packages com.databricks:spark-avro_2.11:4.0.0
+import com.databricks.spark.avro._
+spark.read.avro("/user/matishpatil/cca175_practice_test1/problem1/data/stocks_eod").show
+spark.read.avro("/user/matishpatil/cca175_practice_test1/problem1/data/stocks_eod").count
+=========================================================================================================
+

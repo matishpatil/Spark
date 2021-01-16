@@ -1,0 +1,124 @@
+syntax: rank().over(spec) where spec = Window.partitionBy('ColumnName')
+
+from pyspark.sql.window import *
+from pyspark.sql.functions import *
+
+orderItems = spark.read.csv("/user/matishpatil/retail_db/order_items").toDF('order_item_id', 'order_item_order_id', 'order_item_product_id', 'order_item_quantity', 'order_item_subtotal', 'order_item_product_price')
+
+spec = Window.partitionBy(orderItems.order_item_order_id)
+orderItems.withColumn('order_revenue', round(sum('order_item_subtotal').over(spec),2)). \
+    select('order_item_id','order_item_order_id','order_item_subtotal','order_revenue').show()
+===================================================================================================
+from pyspark.sql.functions import *
+from pyspark.sql.window import *
+
+spark.conf.set('spark.sql.shuffle.partitions','2')
+
+spark = SparkSession. \
+  builder. \
+  master('local'). \
+  appName('CSV Example'). \
+  getOrCreate()
+
+orders = spark.read. \
+  format('csv'). \
+  schema('order_id int, order_date string, order_customer_id int, order_status string'). \
+  load('hdfs://nn01.itversity.com:8020/user/matishpatil/retail_db/orders')
+  
+orderItems = spark.read. \
+  format('csv'). \
+  schema('''order_item_id int, 
+            order_item_order_id int, 
+            order_item_product_id int, 
+            order_item_quantity int,
+            order_item_subtotal float,
+            order_item_product_price float
+         '''). \
+  load('hdfs://nn01.itversity.com:8020/user/matishpatil/retail_db/order_items')
+  
+dailyProductRevenue = orders \
+    .where("order_status in ('COMPLETE', 'CLOSED')") \
+    .join(orderItems, orders.order_id == orderItems.order_item_order_id, 'inner') \
+    .groupBy('order_date','order_item_product_id') \
+    .agg(round(sum('order_item_subtotal'),2).alias('revenue'))
+
+dailyProductRevenueSorted = dailyProductRevenue.orderBy(dailyProductRevenue.order_date, dailyProductRevenue.revenue.desc())
+  
+spec = Window.partitionBy('order_date')
+orders.select('order_id', 'order_date', 'order_customer_id','order_status',count('order_date').over(spec).alias('daily_count')).show()
+===================================================================================================
+from pyspark.sql.functions import *
+from pyspark.sql.window import *
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName('Explore Window Aggregate Functions').master('local').getOrCreate()
+spark.conf.set('spark.sql.shuffle.partitions','2')
+
+employeesPath = '/public/hr_db/employees/part-m-00000'
+employees = spark.read.format('csv').option('sep','\t') \
+            .schema('''employee_id INT,
+                      first_name STRING,
+                      last_name STRING,
+                      email STRING,
+                      phone_number STRING,
+                      hire_date STRING,
+                      job_id STRING,
+                      salary FLOAT,
+                      comission_pct STRING,
+                      manager_id STRING,
+                      department_id STRING
+                      ''').load(employeesPath)
+
+spec = Window.partitionBy('department_id')
+employees.select('employee_id','department_id','salary') \
+    .withColumn('salary_expense', sum('salary').over(spec)) \
+    .withColumn('least_salary', min('salary').over(spec)) \
+    .withColumn('max_salary', max('salary').over(spec)) \
+    .withColumn('avg_salary', round(avg('salary').over(spec),2)) \
+    .withColumn('salary_pct', round(employees.salary/col('salary_expense') * 100, 2)) \
+    .sort('department_id').show()
+===========================================================================================
+Get the average salary for each department and get all employee details who earn more than the average salary
+Get the average revenue for each day and get all the orders who earn revenue more than average revenue
+Get the highest order revenue and get all the orders which have revenue more than 75% of the revenue
+===========================================================================================
+spec = Window.partitionBy('department_id').orderBy(employees.salary.desc())
+employeesLead = employees.select('employee_id','department_id','salary') \
+    .withColumn('next_employee_id', lead('employee_id').over(spec)) \
+    .withColumn('next_salary', lead('salary').over(spec)) \
+    .sort('department_id', employees.salary.desc())
+    
+employeesLag = employees.select('employee_id','department_id','salary') \
+    .withColumn('prev_employee_id', lag('employee_id').over(spec)) \
+    .withColumn('prev_salary', lag('salary').over(spec)) \
+    .sort('department_id', employees.salary.desc())
+    
+employeesFirst = employees.select('employee_id','department_id','salary') \
+    .withColumn('first_salary', first('salary').over(spec)) \
+    .sort('department_id', employees.salary.desc())
+    
+spec = Window.partitionBy('department_id').orderBy(employees.salary.desc()) \
+    .rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
+employeesLast = employees.select('employee_id','department_id','salary') \
+    .withColumn('last_salary', last('salary', False).over(spec)) \
+    .sort('department_id', employees.salary.desc())
+======================================================================================
+spec = Window.partitionBy('department_id').orderBy(employees.salary.desc())
+employeesRank = employees.select('employee_id','department_id','salary') \
+    .withColumn('rank', rank().over(spec)) \
+    .withColumn('dense_rank', dense_rank().over(spec)) \
+    .withColumn('row_number', row_number().over(spec)) \
+    .orderBy('department_id', employees.salary.desc())
+======================================================================================
+pyspark --master yarn \
+    --conf spark.ui.port=32421 \
+    --num-executors 6 \
+    --executor-cores 6 \
+    --executor-memory 2G
+======================================================================================
+hdfs fsck /public/crime/csv -blocks
+======================================================================================
+
+======================================================================================
+
+======================================================================================

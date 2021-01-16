@@ -1,0 +1,48 @@
+# Ascending order - Get Revenue for Order ID
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+l = orderItemsGroupByOrderId.first()
+list(l[1])
+list(l[1])[1]
+help(pyspark.resultiterable.ResultIterable)
+revenuePerOrderId = orderItemsGroupByOrderId.map(lambda oi: (oi[0], round(sum(oi[1]),2)))
+
+# DescendingOrder - Get order item with minimum subtotal for order ID
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), oi))
+for i in orderItemsMap.take(10): print(i)
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+orderItemsSortedBySubtotalPerOrder = orderItemsGroupByOrderId.flatMap(lambda oi: sorted(oi[1], key=lambda k: float(k.split(",")[4]), reverse=True))
+for i in orderItemsSortedBySubtotalPerOrder.take(10): print(i)
+
+# ReduceByKey - Get order item with minimum subtotal for order ID
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+revenuePerOrderId = orderItemsMap.reduceByKey(lambda x,y: round((x + y),2))
+for i in revenuePerOrderId.take(10): print(i)
+minSubtotalPerOrderId = orderItemsMap.reduceByKey(lambda x,y: x if(x < y) else y)
+for i in minSubtotalPerOrderId.take(10): print(i)
+
+# AggregateByKey - Total Value with no. of items - (init value, lambda, lambda)
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItemsMap = orderItems.map(lambda oi: (int(oi.split(",")[1]), float(oi.split(",")[4])))
+revenuePerOrder = orderItemsMap.aggregateByKey((0.0, 0), lambda x,y: (round(x[0] + y,2), x[1] + 1), lambda x,y: (round(x[0] + y[0],2), x[1] + y[1]))
+for i in revenuePerOrder.take(10): print(i)
+
+#sortByKey - sort data by product price
+products = sc.textFile("/public/retail_db/products")
+productsMap = products.filter(lambda x: x.split(",")[4] != "").map(lambda p: (float(p.split(",")[4]), p))
+productsSortedByPrice = productsMap.sortByKey()
+for i in productsSortedByPrice.take(10): print(i)
+productSorted = productsSortedByPrice.map(lambda x: x[1])
+for i in productSorted.take(10): print(i)
+
+#Sort data by categoryId and then by price descending - composite key sorting
+products = sc.textFile("/public/retail_db/products")
+productsMap = products.filter(lambda x: x.split(",")[4] != "").map(lambda p: ((int(p.split(",")[1]),-float(p.split(",")[4])), p))
+productsSortedByPrice = productsMap.sortByKey()
+productSorted = productsSortedByPrice.map(lambda x: x[1])
+for i in productSorted.take(10): print(i)

@@ -1,0 +1,47 @@
+# Get Top N products by price - Global Ranking - sortByKey & take
+products = sc.textFile("/public/retail_db/products")
+productsMap = products.filter(lambda x: x.split(",")[4] != "").map(lambda p: (float(p.split(",")[4]), p))
+productsSortedByPrice = productsMap.sortByKey(False)
+productSorted = productsSortedByPrice.map(lambda x: x[1])
+for i in productSorted.take(10): print(i)
+
+# top - sort in descending order by default
+products = sc.textFile("/public/retail_db/products")
+productsFiltered = products.filter(lambda x: x.split(",")[4] != "")
+topNProducts = productsFiltered.top(5, key=lambda k: float(k.split(",")[4]))
+for i in topNProducts: print(i)
+
+# takeOrdered - sort in ascending order by default
+products = sc.textFile("/public/retail_db/products")
+productsFiltered = products.filter(lambda x: x.split(",")[4] != "")
+topNProducts = productsFiltered.takeOrdered(5, key=lambda k: -float(k.split(",")[4]))
+for i in topNProducts: print(i)
+
+# Get top N products by price per category
+products = sc.textFile("/public/retail_db/products")
+productsFiltered = products.filter(lambda x: x.split(",")[4] != "")
+productsMap = productsFiltered.map(lambda p: (int(p.split(",")[1]),p))
+productsGroupByCategoryId = productsMap.groupByKey()
+for i in productsGroupByCategoryId.take(10): print(i)
+topNProductsByCategory = productsGroupByCategoryId.flatMap(lambda l: sorted(l[1], key=lambda k: float(k.split(",")[4]), reverse=True)[:3])
+for i in topNProductsByCategory.take(10): print(i)
+
+# Get top N priced products
+products = sc.textFile("/public/retail_db/products")
+productsFiltered = products.filter(lambda x: x.split(",")[4] != "")
+productsMap = productsFiltered.map(lambda p: (int(p.split(",")[1]),p))
+productsGroupByCategoryId = productsMap.groupByKey()
+t = productsGroupByCategoryId.filter(lambda p: p[0] == 59).first()
+getTopNPricedProductsPerCategoryId(t,3)
+
+topNPricedProducts = productsGroupByCategoryId. \
+flatMap(lambda p: getTopNPricedProductsPerCategoryId(p, 3))
+for i in topNPricedProducts.collect(): print(i)
+
+def getTopNPricedProductsPerCategoryId(productsPerCategoryId, topN):
+    productsSorted = sorted(t[1], key=lambda k: float(k.split(",")[4]), reverse=True)
+    productPrices = map(lambda p: float(p.split(",")[4]), productsSorted)  
+    topNPrices = sorted(set(productPrices), reverse=True)[:topN]
+    import itertools as it
+    topNPricedProducts = it.takewhile(lambda p: float(p.split(",")[4]) in topNPrices, productsSorted)
+    return list(topNPricedProducts)

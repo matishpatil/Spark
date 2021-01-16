@@ -1,0 +1,13 @@
+import org.apache.spark.sql.functions
+
+substring($"phone_number", -4, 4).cast("int")
+substring($"ssn", 8, 4).cast("int")
+
+concat(col("first_name"), lit(", "), col("last_name"))
+
+trunc(current_date, "MM")
+date_trunc("MM", current_timestamp())
+==========================================================================
+import sys.process._
+"hdfs dfs -ls /public/airlines_all/airlines-part/flightmonth=200801" !
+

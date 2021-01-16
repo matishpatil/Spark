@@ -1,0 +1,10 @@
+spark2-submit --packages com.databricks:spark-xml_2.11:0.4.1,com.databricks:spark-csv_2.11:1.5.0 /home/matishpatil/development/pluralsight/python/code/6/prepare_data_posts_all_csv.py
+
+from pyspark import RDD
+for (k,v) in locals().items():
+    if isinstance(v, RDD):
+        print k
+        
+print(badges_sorted.toDebugString())
+
+

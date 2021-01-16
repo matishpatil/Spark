@@ -1,0 +1,60 @@
+org.apache.spark.sql
+
+spark-shell --master "local[*]"
+spark2-shell --master yarn --conf spark.ui.port=0
+
+import org.apache.spark.sql.SparkSession
+
+val spark = SparkSession.builder.appName("Data Processing").master("yarn").config("spark.ui.port","0").getOrCreate()
+
+spark.sparkContext.getConf.getAll.foreach(println)
+
+hdfs dfs -ls /public/retail_db/orders
+hdfs dfs -tail /public/retail_db/orders/part-00000
+==========================================================================
+val orders = spark.read.schema(""" order_id INT, order_date TIMESTAMP, order_customer_id INT, order_status STRING""").csv("/public/retail_db/orders/part-00000")
+
+val orders = spark.read.schema(""" order_id INT, order_date TIMESTAMP, order_customer_id INT, order_status STRING""").format("csv").load("/public/retail_db/orders/part-00000")
+
+val orders = spark.read.schema(""" order_id INT, order_date TIMESTAMP, order_customer_id INT, order_status STRING""").format("json").load("/public/retail_db_json/orders/*")
+
+orders.take(10).foreach(println)
+==========================================================================
+import org.apache.spark.sql.functions
+
+col - is used to convert string to column type
+lit - is used to convert a literal to column value so that it can be used to generate dervied fields by manipulating using literals.
+
+import org.apache.spark.implicits._
+import org.apache.spark.sql.functions.{col, lit, concat}
+
+spark.conf.get("spark.sql.parquet.compression.codec")
+
+mode("overwrite")
+
+import sys.process._
+"hdfs dfs -ls /user/training/retail_db/orders" !
+
+option("compression", "bzip")
+
+spark.read.parquet("/user/training/retail_db/orders").printSchema
+spark.read.parquet("/user/training/retail_db/orders").show
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
+
+==========================================================================
